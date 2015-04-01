@@ -48,10 +48,10 @@ void setup() {
 	// Initialize Serial and Easy Transfer
 	Serial.begin(9600);
 	delay(1000);
-	Serial.println("Serial is ready.");
+	//Serial.println("Serial is ready.");
 	
 	// Initialize Easy-Transfer Lib
-	//ET.begin(details(rocketcontrols), &Serial);
+	ET.begin(details(rocketcontrols), &Serial);
 	
 	// Initialize USB
 	if (Usb.Init() == -1) { // Halt!
@@ -62,7 +62,7 @@ void setup() {
 		}
 	}
 	
-	Serial.println("USB Initialized!");
+	//Serial.println("USB Initialized!");
 	
 	randomSeed(analogRead(0));
 	
@@ -80,10 +80,7 @@ void loop() {
 		
 		mode = mode == MODE_DRIVING ? MODE_ARM : MODE_DRIVING;
 	
-        	modeChange(mode);
-		
-		Serial.print("Switched to mode:");
-		Serial.println(mode); 
+        	modeChange(mode); 
 	}
 	
 	switch(mode) {
@@ -125,48 +122,25 @@ void loop() {
 		// ENGINE 1  
 		rocketcontrols.engine1 = PS3.getButtonClick(L1) && PS3.getButtonClick(R1);
 		
-		/*
-		Serial.print("throttle=");
-		Serial.print(rocketcontrols.throttle);
-		Serial.print(", stearing=");
-		Serial.print(rocketcontrols.stearing);
-		Serial.print(", breaks=");
-		Serial.print(rocketcontrols.breaks);
-		Serial.print(", breaking=");
-		Serial.print(rocketcontrols.breaking);
-		Serial.println("");
-		*/
-		
 	break;
 	case MODE_ARM:
 	
 		int deadzone = 15;
 		
-		int sholderVal = armValue(int( PS3.getAnalogHat(LeftHatX) ), deadzone, false);
-		int armVal = armValue(int( PS3.getAnalogHat(LeftHatY) ), deadzone, false);
+		int sholderVal = armValue(int( PS3.getAnalogHat(LeftHatX) ), deadzone, true);
+		int armVal = armValue(int( PS3.getAnalogHat(LeftHatY) ), deadzone, true);
 		int forearmVal = armValue(int( PS3.getAnalogHat(RightHatX) ), deadzone, false);
-		int handVal = armValue(int( PS3.getAnalogHat(RightHatY) ), deadzone, false);
+		int handVal = armValue(int( PS3.getAnalogHat(RightHatY) ), deadzone, true);
 		
 		rocketcontrols.armM1 = sholderVal;
 		rocketcontrols.armM2 = armVal;
 		rocketcontrols.armM3 = forearmVal;
 		rocketcontrols.armM4 = handVal;
 
-		/*
-		Serial.print("armM1=");
-		Serial.print(rocketcontrols.armM1);
-		Serial.print(", armM2=");
-		Serial.print(rocketcontrols.armM2);
-		Serial.print(", armM3=");
-		Serial.print(rocketcontrols.armM3);
-		Serial.print(", armM4=");
-		Serial.print(rocketcontrols.armM4);
-		Serial.println("");
-		*/
-
 	break;
 	}
 	
+/*
 	Serial.print("throttle=");
 	Serial.print(rocketcontrols.throttle);
 	Serial.print(", stearing=");
@@ -182,9 +156,10 @@ void loop() {
 	Serial.print(", armM4=");
 	Serial.print(rocketcontrols.armM4);
 	Serial.println("");
+*/
 	
 
-	//ET.sendData();
+	ET.sendData();
 	
 	delay(50);
 }
@@ -200,7 +175,7 @@ void modeChange(int mode) {
 	rocketcontrols.engine1 = false;
 	rocketcontrols.engine1 = false;
 
-        PS3.setRumbleOn(200, 100, 0, 0);
+        //PS3.setRumbleOn(200, 100, 0, 0);
 	//PS3.setRumbleOn(RumbleHigh );
 	
 	if (mode == MODE_DRIVING) {
