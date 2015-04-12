@@ -17,7 +17,7 @@ EasyTransfer ET;
 
 struct SEND_DATA_STRUCTURE{
 	int throttle;
-	int breaks;
+	int reverse;
 	int stearing;
 	boolean armESC;
 	boolean breaking;
@@ -67,8 +67,7 @@ void setup() {
 	randomSeed(analogRead(0));
 	
 	modeChange(mode);
-	delay(200);
-		
+	delay(200);		
 }
 
 void loop() {
@@ -92,24 +91,23 @@ void loop() {
 		// Throttle
 		if(PS3.getAnalogButton(R2)) {
 			rocketcontrols.throttle = int( PS3.getAnalogButton(R2) );
-			rocketcontrols.breaking = false;
 		} else {
 			rocketcontrols.throttle = 0;
 		}
 		
-		// Breaking
+		// Reverse
 		if(PS3.getAnalogButton(L2)) {
-			rocketcontrols.breaks = int( PS3.getAnalogButton(L2) );
-			rocketcontrols.breaking = true;
+			rocketcontrols.reverse = int( PS3.getAnalogButton(L2) );
 		} else {
-			rocketcontrols.breaks = 0;
-			rocketcontrols.breaking = false;
+			rocketcontrols.reverse = 0;
 		}
-		
+
 		// Breaking
 		if(PS3.getButtonClick(CIRCLE)) {
 			rocketcontrols.breaking = true;    
-		}
+		} else {
+			rocketcontrols.breaking = false;  
+                }
 		
 		// Headlights
 		if(PS3.getButtonClick(L3)) {
@@ -129,9 +127,18 @@ void loop() {
 		
 		int sholderVal = armValue(int( PS3.getAnalogHat(LeftHatX) ), deadzone, true);
 		int armVal = armValue(int( PS3.getAnalogHat(LeftHatY) ), deadzone, true);
-		int forearmVal = armValue(int( PS3.getAnalogHat(RightHatX) ), deadzone, false);
-		int handVal = armValue(int( PS3.getAnalogHat(RightHatY) ), deadzone, true);
+		int forearmVal = armValue(int( PS3.getAnalogHat(RightHatY) ), deadzone, false);
+		//int handVal = armValue(int( PS3.getAnalogHat(RightHatX) ), deadzone, true);
 		
+                int handVal = 0;
+		if(PS3.getButtonPress(TRIANGLE)) {
+                    handVal = 255;
+		} else if (PS3.getButtonPress(CROSS)) {
+                    handVal = -255;
+                } else {
+                    handVal = 0;
+                }
+
 		rocketcontrols.armM1 = sholderVal;
 		rocketcontrols.armM2 = armVal;
 		rocketcontrols.armM3 = forearmVal;
@@ -145,8 +152,10 @@ void loop() {
 	Serial.print(rocketcontrols.throttle);
 	Serial.print(", stearing=");
 	Serial.print(rocketcontrols.stearing);
-	Serial.print(", breaks=");
-	Serial.print(rocketcontrols.breaks);
+	Serial.print(", reverse=");
+	Serial.print(rocketcontrols.reverse);
+	Serial.print(", breaking=");
+	Serial.print(rocketcontrols.breaking);
 	Serial.print(", armM1=");
 	Serial.print(rocketcontrols.armM1);
 	Serial.print(", armM2=");
@@ -157,8 +166,6 @@ void loop() {
 	Serial.print(rocketcontrols.armM4);
 	Serial.println("");
 */
-	
-
 	ET.sendData();
 	
 	delay(50);
@@ -167,14 +174,18 @@ void loop() {
 
 void modeChange(int mode) {
 	rocketcontrols.throttle = 0;
-	rocketcontrols.breaks = 0;
+	rocketcontrols.reverse = 0;
 	rocketcontrols.stearing = 125;
 	rocketcontrols.armESC = false;
 	rocketcontrols.breaking = false;
 	rocketcontrols.headlights = false;
 	rocketcontrols.engine1 = false;
 	rocketcontrols.engine1 = false;
-
+        rocketcontrols.armM1 = 0;
+	rocketcontrols.armM2 = 0;
+	rocketcontrols.armM3 = 0;
+	rocketcontrols.armM4 = 0;
+        
         //PS3.setRumbleOn(200, 100, 0, 0);
 	//PS3.setRumbleOn(RumbleHigh );
 	
