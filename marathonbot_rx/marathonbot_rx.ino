@@ -73,7 +73,6 @@ int motorInit = 0;
 
 void loop(){
 
-/*
     if (!shutdown && digitalRead(SHUTDOWN_PIN) == HIGH) {
       shutdown = true;
     }
@@ -88,44 +87,44 @@ void loop(){
         arm.armForearm = -1;
         arm.armWrist = -1;
         arm.armClaw = -1;
+        
         // And send to arm
         ETArm.sendData(I2C_SLAVE_ADDRESS);
         
         delay(18);
         return; 
     }
-*/
-    
+
 
     if(ET.receiveData()) {
     			
-        // Steering
-        int steeringVal = controller.steering;
-        // Invert steering because servo is mounted backwards
-        steering.write(map(steeringVal, 0, 255, 255, 0));
-        
-		// Throttle
-        if (controller.breaking) {
-            throttle.write(0);
-        } else if (controller.reverse > 5) {
-            throttle.write( map(controller.reverse, 5, 255, 124, 0) );
-        } else if (controller.throttle > 5) {  
-            throttle.write( map(controller.throttle, 5, 255, 130, 255) );
-        } else {
-            throttle.write(127);
-        }	
-		
-		// Pass on arm values
-		arm.armBase = controller.armBase;
-		arm.armSholder = controller.armSholder;
-		arm.armForearm = controller.armForearm;
-		arm.armWrist = controller.armWrist;
-        arm.armClaw = controller.armClaw;
-	
-		// And send to arm
-		ETArm.sendData(I2C_SLAVE_ADDRESS);
-		
-		delay(18);	
+      // Steering
+      int steeringVal = controller.steering;
+      // Invert steering because servo is mounted backwards
+      steering.write(map(steeringVal, 0, 255, 255, 0));
+
+		  // Throttle
+      if (controller.breaking) {
+          throttle.write(0);
+      } else if (controller.reverse > 5) {
+          throttle.write( map(controller.reverse, 5, 255, 124, 0) );
+      } else if (controller.throttle > 5) {  
+          throttle.write( map(controller.throttle, 5, 255, 130, 255) );
+      } else {
+          throttle.write(127);
+      }	
+  		
+  		// Pass on arm values
+      arm.armBase = controller.armBase;
+      arm.armSholder = controller.armSholder;
+      arm.armForearm = controller.armForearm;
+      arm.armWrist = controller.armWrist;
+      arm.armClaw = controller.armClaw;
+  	
+  		// And send to arm
+  		ETArm.sendData(I2C_SLAVE_ADDRESS);
+  		
+  		delay(18);	
 	}
 
 }
