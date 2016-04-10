@@ -3,8 +3,8 @@
 
 #define DEBUG_PRINT false
 
-#define MODE_DRIVING  0
-#define MODE_ARM  1
+#define ARM_MODE_DRIVING 0
+#define ARM_MODE_CUP 1
 
 #define MAX_RESET 7 //MAX3421E pin 12
 #define MAX_GPX   8 //MAX3421E pin 17
@@ -15,20 +15,22 @@
 
 #define THROTTLE_IDLE     127
 
-#define ARM_BASE_MIN   50
-#define ARM_BASE_MAX   150
-#define ARM_SHOLDER_MIN   50
-#define ARM_SHOLDER_MAX   150
-#define ARM_FOREARM_MIN   50
-#define ARM_FOREARM_MAX   150
-#define ARM_WRIST_MIN   50
-#define ARM_WRIST_MAX   150
-#define ARM_CLAW_MIN   50
+#define ARM_BASE_MIN   0
+#define ARM_BASE_MAX   180
+#define ARM_SHOLDER_MIN   5
+#define ARM_SHOLDER_MAX   90
+#define ARM_FOREARM_MIN   0
+#define ARM_FOREARM_MAX   180
+#define ARM_WRIST_MIN   0
+#define ARM_WRIST_MAX   180
+#define ARM_CLAW_MIN   5
 #define ARM_CLAW_MAX   150
 
 #define LIGHT_MODE_IDLE        0
 #define LIGHT_MODE_TRIM_LEFT   2
 #define LIGHT_MODE_TRIM_RIGHT  3
+
+#define CONTROL_DEADZONE 15
 
 // Initialize USB Hooks
 USB Usb;
@@ -41,10 +43,10 @@ EasyTransfer ET;
 struct SEND_DATA_STRUCTURE{
     int throttle = 0;
     int reverse = 0;
-    int steering = 125;
+    int steering = 128;
     boolean breaking = false;
     int armBase = 90;
-    int armSholder = 90;
+    int armSholder = 50;
     int armForearm = 90;
     int armWrist = 90; 
     int armClaw = 80; 
@@ -52,7 +54,7 @@ struct SEND_DATA_STRUCTURE{
 
 SEND_DATA_STRUCTURE rocketcontrols;
 
-volatile int mode = MODE_DRIVING;
+volatile int armMode = ARM_MODE_DRIVING;
 
 volatile int trim = TRIM_DEFAULT;
 volatile int controllerLightMode = LIGHT_MODE_IDLE;
@@ -73,7 +75,7 @@ void setup() {
     // Initialize Serial and Easy Transfer
     Serial.begin(9600);
     delay(1000);
-    //Serial.println("Serial is ready.");
+    if (DEBUG_PRINT) Serial.println("Serial is ready.");
     
     // Initialize Easy-Transfer Lib
     ET.begin(details(rocketcontrols), &Serial);
@@ -91,7 +93,8 @@ void setup() {
     
     randomSeed(analogRead(0));
     
-    modeChange(mode);
+    setArmMode(ARM_MODE_DRIVING);
+    
     delay(200);     
 }
 
@@ -99,75 +102,73 @@ void loop() {
 
     Usb.Task();
     
-    // Mode selection
-    if( PS3.getButtonClick(SELECT) ) {
-        
-        mode = mode == MODE_DRIVING ? MODE_ARM : MODE_DRIVING;
     
-        modeChange(mode); 
+    // steering
+    rocketcontrols.steering = processSteering();
+    
+    // Steering Trim
+    if (PS3.getButtonClick(RIGHT)) {
+        adjustTrim(TRIM_AMOUNT);
+    } else if (PS3.getButtonClick(LEFT)) {
+        adjustTrim(-TRIM_AMOUNT);
     }
     
-    switch(mode) {
-    case MODE_DRIVING: 
-        
-        // steering
-        rocketcontrols.steering = processSteering();
-
-        // Steering Trim
-        if (PS3.getButtonClick(RIGHT)) {
-            adjustTrim(TRIM_AMOUNT);
-        } else if (PS3.getButtonClick(LEFT)) {
-            adjustTrim(-TRIM_AMOUNT);
-        }
-        
-        // Throttle
-        if(PS3.getAnalogButton(R2)) {
-            rocketcontrols.throttle = int( PS3.getAnalogButton(R2) );
-        } else {
-            rocketcontrols.throttle = 0;
-        }
-        
-        // Reverse
-        if(PS3.getAnalogButton(L2)) {
-            rocketcontrols.reverse = int( PS3.getAnalogButton(L2) );
-        } else {
-            rocketcontrols.reverse = 0;
-        }
-
-        // Breaking
-        if(PS3.getAnalogButton(CIRCLE)) {
-            rocketcontrols.breaking = true;    
-        } else {
-            rocketcontrols.breaking = false;  
-        }
-        
-        
-    break;
-    case MODE_ARM:
-    
-        int deadzone = 15;      
-
-        if(PS3.getAnalogButton(TRIANGLE)) {
-            rocketcontrols.armClaw = rocketcontrols.armClaw + 1;
-        } else if (PS3.getAnalogButton(CROSS)) {
-            rocketcontrols.armClaw = rocketcontrols.armClaw - 1;
-        }
- 
-        rocketcontrols.armBase = controlDelta( rocketcontrols.armBase, int(PS3.getAnalogHat(LeftHatX)), deadzone, 5);
-        rocketcontrols.armSholder = controlDelta( rocketcontrols.armSholder, int(PS3.getAnalogHat(LeftHatY)), deadzone, 5);
-        rocketcontrols.armForearm = controlDelta( rocketcontrols.armForearm, int(PS3.getAnalogHat(RightHatY)), deadzone, 5);
-        rocketcontrols.armWrist = controlDelta( rocketcontrols.armWrist, int(PS3.getAnalogHat(RightHatX)), deadzone, 5);
-
-        // Apply Boundaries
-        rocketcontrols.armBase = constrain(rocketcontrols.armBase, ARM_BASE_MIN, ARM_BASE_MAX);
-        rocketcontrols.armSholder = constrain(rocketcontrols.armSholder, ARM_SHOLDER_MIN, ARM_SHOLDER_MAX);
-        rocketcontrols.armForearm = constrain(rocketcontrols.armForearm, ARM_FOREARM_MIN, ARM_FOREARM_MAX);
-        rocketcontrols.armWrist = constrain(rocketcontrols.armWrist, ARM_WRIST_MIN, ARM_WRIST_MAX);
-        rocketcontrols.armClaw = constrain(rocketcontrols.armClaw, ARM_CLAW_MIN, ARM_CLAW_MAX);
-
-    break;
+    // Throttle
+    if(PS3.getAnalogButton(R2)) {
+        rocketcontrols.throttle = int( PS3.getAnalogButton(R2) );
+    } else {
+        rocketcontrols.throttle = 0;
     }
 
+    // Mini-Throttle
+    if(PS3.getAnalogButton(R1)) {
+      rocketcontrols.throttle = 40;
+    }
+    
+    // Reverse
+    if(PS3.getAnalogButton(L2)) {
+        rocketcontrols.reverse = int( PS3.getAnalogButton(L2) );
+    } else {
+        rocketcontrols.reverse = 0;
+    }
+        
+    int deadzone = 15;      
+    
+    if(PS3.getAnalogButton(TRIANGLE)) {
+        rocketcontrols.armClaw = rocketcontrols.armClaw + 1;
+    } else if (PS3.getAnalogButton(CROSS)) {
+        rocketcontrols.armClaw = rocketcontrols.armClaw - 1;
+    }
+    
+    if (PS3.getAnalogButton(SQUARE)) {
+      setArmMode(ARM_MODE_DRIVING);
+    } else if (PS3.getAnalogButton(CIRCLE)) {
+      setArmMode(ARM_MODE_CUP); 
+    }
+    
+    
+    if (PS3.getAnalogButton(UP)) {
+      rocketcontrols.armForearm = 80;
+    } else if (PS3.getAnalogButton(DOWN)) {
+      rocketcontrols.armForearm = 100;
+    } else {
+      rocketcontrols.armForearm = 90;
+    }
+    
+    
+    rocketcontrols.armBase = controlDelta( rocketcontrols.armBase, int(PS3.getAnalogHat(RightHatX)), CONTROL_DEADZONE, 5);
+    //rocketcontrols.armSholder = controlDelta( rocketcontrols.armSholder, int(PS3.getAnalogHat(LeftHatY)), CONTROL_DEADZONE, 5);
+    //rocketcontrols.armForearm = controlDelta( rocketcontrols.armForearm, int(PS3.getAnalogHat(RightHatY)), CONTROL_DEADZONE, 5);
+    //rocketcontrols.armWrist = controlDelta( rocketcontrols.armWrist, int(PS3.getAnalogHat(RightHatX)), CONTROL_DEADZONE, 5);
+
+  
+    
+    // Apply Boundaries
+    rocketcontrols.armBase = constrain(rocketcontrols.armBase, ARM_BASE_MIN, ARM_BASE_MAX);
+    rocketcontrols.armSholder = constrain(rocketcontrols.armSholder, ARM_SHOLDER_MIN, ARM_SHOLDER_MAX);
+    //rocketcontrols.armForearm = constrain(rocketcontrols.armForearm, ARM_FOREARM_MIN, ARM_FOREARM_MAX);
+    //rocketcontrols.armWrist = constrain(rocketcontrols.armWrist, ARM_WRIST_MIN, ARM_WRIST_MAX);
+    rocketcontrols.armClaw = constrain(rocketcontrols.armClaw, ARM_CLAW_MIN, ARM_CLAW_MAX);
 
 
     if (DEBUG_PRINT) {
@@ -204,29 +205,33 @@ void loop() {
 }
 
 
-void modeChange(int mode) {
-    rocketcontrols.throttle = 0;
-    rocketcontrols.reverse = 0;
-   // rocketcontrols.steering = 125;
-    rocketcontrols.breaking = false;
-        
-        //PS3.setRumbleOn(200, 100, 0, 0);
-    //PS3.setRumbleOn(RumbleHigh );
-    
+void setArmMode(int armModeToSet) {
+  
+  if (armModeToSet == ARM_MODE_DRIVING) {
+    rocketcontrols.armBase = 90;
+    rocketcontrols.armSholder = 50;
+  } else {
+    rocketcontrols.armBase = 90;
+    rocketcontrols.armSholder = 20;
+  }
+  
 }
 
 int controlDelta(int sourceVal, int sourceControl, int deadzone, int maxSteps) {
     int deltaVal = 0;
     int calculatedVal = 0;
     if (sourceControl >= 125 + deadzone) {
+        deltaVal = map(sourceControl, 128, 0, 1, maxSteps);
+        calculatedVal = sourceVal - deltaVal;
+    } else if (sourceControl <= 125 - deadzone) {
         deltaVal = map(sourceControl, 128, 255, 1, maxSteps);
         calculatedVal = sourceVal + deltaVal;
-    } else if (sourceControl <= 125 - deadzone) {
-        deltaVal = map(sourceControl, 0, 128, 1, maxSteps);
-        calculatedVal = sourceVal - deltaVal;
+      
+
     } else {
         calculatedVal = sourceVal;
     }
+
     return calculatedVal;
 }
 
@@ -256,39 +261,28 @@ void processControllerLights() {
     switch(controllerLightMode) {
   case LIGHT_MODE_IDLE:
 
-    if (mode == MODE_DRIVING) {
         
-         // Race Lights
-        raceLightCounter++;
-        if (raceLightCounter != 5) return;
-        raceLightCounter = 0;
-        for (int led = 0; led < 4; led++) {
-            if (led == raceLightIndex) {
-                PS3.setLedOn(LEDs[led]);
-            } else {
-                PS3.setLedOff(LEDs[led]);
-            }
-        }  
-        raceLightIndex++;
-        if (raceLightIndex > 3) raceLightIndex = 0;
+     // Race Lights
+    raceLightCounter++;
+    if (raceLightCounter != 5) return;
+    raceLightCounter = 0;
+    for (int led = 0; led < 4; led++) {
+        if (led == raceLightIndex) {
+            PS3.setLedOn(LEDs[led]);
+        } else {
+            PS3.setLedOff(LEDs[led]);
+        }
+    }  
+    raceLightIndex++;
+    if (raceLightIndex > 3) raceLightIndex = 0;
         
-    } else {
-
-        // Arm Indicator        
-        PS3.setLedOff(LED1);
-        PS3.setLedOn(LED2);
-        PS3.setLedOn(LED3);
-        PS3.setLedOff(LED4);
-    }
-
-    
  break;
   case LIGHT_MODE_TRIM_LEFT:
-  
-      PS3.setLedOn(LED4);
-      PS3.setLedOn(LED3);
-      PS3.setLedOff(LED2);
-      PS3.setLedOff(LED1);
+
+    PS3.setLedOn(LED4);
+    PS3.setLedOn(LED3);
+    PS3.setLedOff(LED2);
+    PS3.setLedOff(LED1);
 
     lightTrimCounter++;
     if (lightTrimCounter == 18) {
